@@ -4334,7 +4334,7 @@ body {
 /* ---------- Siiri köök (kitchenIntro/kitchenStep m.fl., app.js) ---------- */
 .kitstage {
   position: relative;
-  height: 320px;
+  height: 440px;
   margin: 12px 0;
   border-radius: var(--r-md);
   overflow: hidden;
