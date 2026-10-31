@@ -4374,7 +4374,11 @@ body {
 .kitbowl {
   position: absolute;
   left: 50%;
-  bottom: 6px;
+  /* buggrapport: skålen stod till stor del nere i skåpluckorna, inte uppe på bänkskivan -
+     det nya närbilds-köksfotot (kokscen.webp) har bänkskivans framkant mycket högre upp i
+     bilden än den gamla bakgrunden hade. 150px = i linje med kannan/de staplade skålarna
+     som redan är målade på bänken (uppmätt mot bakgrundens egen bänkkant, inte gissat). */
+  bottom: 150px;
   transform: translateX(-50%);
   /* spelkänsla: scale/rotate (kit-pop, kit-armed) vrider runt transform-origin INNAN
      translateX(-50%) - med standardmitten låg vridpunkten en halv bredd bredvid den synliga
@@ -4658,7 +4662,7 @@ body {
 .kitknot {
   position: absolute;
   left: 50%;
-  bottom: 6px;
+  bottom: 150px; /* se .kitbowl - samma bänkkant-korrigering, samma siffra */
   transform: translateX(-50%);
   transform-origin: 0 100%; /* se .kitbowl - vridpunkt på den synliga mitten, nere vid bordet */
   font-size: 64px;
@@ -4789,7 +4793,7 @@ body {
 .kitdoughflat {
   position: absolute;
   left: 50%;
-  bottom: 30px;
+  bottom: 174px; /* se .kitbowl - samma bänkkant-korrigering (+144px), avståndet till .kitpin oförändrat */
   transform: translateX(-50%);
   width: 110px;
   height: 80px;
@@ -4803,7 +4807,7 @@ body {
      litet fast avstånd, så de alltid möts oavsett rutans höjd. Tidigare var kaveln top-
      ankrad och degen bottenankrad, vilket gjorde att kaveln svävade fritt långt ovanför
      degen istället för att röra den. */
-  bottom: 90px;
+  bottom: 234px; /* se .kitbowl - samma bänkkant-korrigering (+144px) */
   left: 50%;
   transform: translateX(-50%);
   transform-origin: 0 50%; /* se .kitbowl - lutningen (rotate, rulli) runt kavelns synliga mitt */
@@ -4826,7 +4830,7 @@ body {
 .kitspread {
   position: absolute;
   left: 50%;
-  bottom: 30px;
+  bottom: 174px; /* se .kitbowl - samma bänkkant-korrigering (+144px) */
   transform: translateX(-50%);
   width: fit-content;
 }
@@ -4848,7 +4852,7 @@ body {
   /* inte uppe i hörnet (top/left 20px) som kiting/kitshaker - där hamnade den rakt ovanpå
      hyllans bråte i kökbakgrunden och gick knappt att se eller hitta. Strax ovanför
      bre-ut-ytan istället, mot en lugnare del av bakgrunden. */
-  bottom: 112px;
+  bottom: 256px; /* se .kitbowl - samma bänkkant-korrigering (+144px), hamnar fortsatt strax ovanför .kitspread */
   left: 16px;
   object-fit: contain;
   cursor: grab;
@@ -5027,7 +5031,7 @@ body {
 .kitbatter {
   position: absolute;
   left: 50%;
-  bottom: 51px;
+  bottom: 195px; /* se .kitbowl - samma bänkkant-korrigering (+144px), ska synas inne i skålen */
   width: 104px;
   height: 28px;
   transform: translateX(-50%);
