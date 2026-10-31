@@ -10478,6 +10478,84 @@
       x >= r.left - pad && x <= r.right + pad && y >= r.top - (padTop == null ? pad : padTop) && y <= r.bottom + pad
     );
   }
+  /* ---- spelkänsla ("juice") för alla köksmoment ----
+     puista är måttstocken: barnen älskade den för att VARJE skak ger ljud + korn + rörelse på
+     en gång, och tonen klättrar för varje skak så man HÖR att det byggs upp. Hjälparna nedan
+     ger de andra momenten samma staplade kanaler med samma lilla verktygslåda (tone() och
+     kortlivade CSS-partiklar), så att varje gest inte uppfinner sitt eget halvdana svar. */
+  var kitCalmMQ = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+  /* pentatonisk durskala - hur många toner i rad som helst låter alltid snällt tillsammans, så
+     en stigande "det byggs upp"-följd blir aldrig falsk oavsett var den börjar eller slutar.
+     i=0 är grundtonen (base, standard C5), varje +5 är en oktav upp. */
+  function kitNote(i, base) {
+    var d = [0, 2, 4, 7, 9];
+    i = Math.max(0, Math.round(i));
+    return (base || 523.25) * Math.pow(2, Math.floor(i / 5) + d[i % 5] / 12);
+  }
+  /* "tusende repetitionen": samma ljud exakt likadant gång på gång blir robotaktigt och
+     slutar höras - ±2 % slumpad tonhöjd är långt under ett tonsteg men räcker för att varje
+     rörelse ska låta levande. */
+  function kitJit(f) {
+    return f * (1 + (Math.random() - 0.5) * 0.04);
+  }
+  /* kortlivade partiklar - samma mönster som kornen i kitchenSprinkleFx (rena DOM-noder med en
+     CSS-animation som städar sig själva), men med valbart utseende/rörelse: kind = flour
+     (mjölpuff), spark (glitter), bubble, smoke, steam eller drop (stänk i en båge). x/y är
+     skärmkoordinater (clientX/Y), spread = hur långt de sprids, rise = extra lyft uppåt. */
+  function kitBits(stage, x, y, n, kind, spread, rise, color) {
+    if (kitCalmMQ && kitCalmMQ.matches) return;
+    var r = stage.getBoundingClientRect(),
+      i;
+    spread = spread || 30;
+    for (i = 0; i < n; i++) {
+      var b = document.createElement("div"),
+        a = Math.random() * Math.PI * 2,
+        d = spread * (0.45 + Math.random() * 0.55);
+      b.className = "kitbit kitbit--" + kind;
+      if (color) b.style.background = color;
+      b.style.left = x - r.left + "px";
+      b.style.top = y - r.top + "px";
+      b.style.setProperty("--dx", (Math.cos(a) * d).toFixed(1) + "px");
+      b.style.setProperty("--dy", (Math.sin(a) * d * 0.6 - (rise || 0)).toFixed(1) + "px");
+      b.style.animationDelay = i * 22 + "ms";
+      stage.appendChild(b);
+      (function (el) {
+        setTimeout(function () {
+          el.remove();
+        }, 1500);
+      })(b);
+    }
+  }
+  /* "nu räcker det"-ögonblicket: samma lilla glittrande treklang + gnistor + en kort vibration
+     varje gång en gest når sin gräns (där Klar-knappen dyker upp). Ett återkommande ljud som
+     barnen lär sig känna igen, medvetet skilt från sndOk (som betyder att ett helt steg är
+     klart) - man får gärna fortsätta röra/knåda/kavla efter det, men man VET att det räcker. */
+  function kitReady(stage, el) {
+    tone(1046.5, 0.07, 0);
+    tone(1318.5, 0.07, 0.065);
+    tone(1568, 0.2, 0.13);
+    buzz(12);
+    var r = el.getBoundingClientRect();
+    kitBits(stage, r.left + r.width / 2, r.top + r.height / 2, 9, "spark", Math.max(46, r.width * 0.55), 6);
+  }
+  /* släpp-målet (skålen i vala, knuten i vormi) tänds och vickar i SAMMA ögonblick som ett
+     släpp skulle lyckas, plus ett litet pling - "släpp nu!" (förväntan innan belöningen).
+     Tyst när det släcks igen, så att dra ut och in igen inte låter som ett fel. */
+  function kitArm(target, on) {
+    if (target.classList.contains("kit-armed") === on) return;
+    target.classList.toggle("kit-armed", on);
+    if (on) {
+      tone(kitJit(kitNote(5)), 0.06, 0);
+      tone(kitJit(kitNote(7)), 0.09, 0.05);
+      buzz(8);
+    }
+  }
+  /* samma sak med hysteres: tänds först 4 px INNANFÖR den riktiga träffzonen (pad) och släcks
+     när man lämnar den - en darrande hand precis på kanten ska inte få plinget att upprepas
+     om och om igen. Tänd betyder alltid att släppet lyckas (aldrig ett falskt löfte). */
+  function kitArmNear(target, x, y, pad) {
+    kitArm(target, kitNear(target, x, y, target.classList.contains("kit-armed") ? pad : pad - 4));
+  }
   /* vala: dra ingrediensen till skålen. Ingen gradering - missar man skålen får man bara
      försöka igen, det finns inget "fel" sätt att till slut få den dit. */
   function kitchenSetupVala(step) {
@@ -10497,13 +10575,19 @@
       startLeft = ing.offsetLeft,
       startTop = ing.offsetTop;
     ing.style.touchAction = "none";
+    /* spelkänsla: ett missat släpp teleporterade tillbaka på en bildruta - nu fjädrar den
+       hem (kit-return, en kort studs), så det läses som "den hoppade tillbaka" och inte som
+       att något gick sönder. Klassen tas bort vid nästa grepp så själva draget inte släpar. */
     function reset() {
+      ing.classList.add("kit-return");
       ing.style.left = startLeft + "px";
       ing.style.top = startTop + "px";
+      kitArm(bowl, false);
     }
     ing.addEventListener("pointerdown", function (e) {
       dragging = true;
       ing.setPointerCapture(e.pointerId);
+      ing.classList.remove("kit-return");
       ing.classList.add("kit-dragging");
     });
     ing.addEventListener("pointermove", function (e) {
@@ -10515,6 +10599,10 @@
       var p = kitClampPos(stage, ing, e.clientX - r.left - 16, e.clientY - r.top - 30);
       ing.style.left = p.left + "px";
       ing.style.top = p.top + "px";
+      /* spelkänsla: skålen tänds i exakt samma läge som släppet nedan skulle lyckas (samma
+         kitNear-test, samma marginal) - man ser OCH hör att det är dags att släppa. */
+      var ar = ing.getBoundingClientRect();
+      kitArmNear(bowl, ar.left + ar.width / 2, ar.top + ar.height / 2, 36);
     });
     /* buggrapport: "fastnar hela tiden" - om en pekarenhet avbryter draget (pointercancel)
        istället för att avsluta det normalt (pointerup) utan den här lyssnaren förblir
@@ -10539,8 +10627,31 @@
         icy = ir.top + ir.height / 2;
       var hit = kitNear(bowl, icx, icy, 36);
       if (hit) {
+        bowl.classList.remove("kit-armed");
         bowl.classList.add("kit-pop");
         sndOk();
+        /* spelkänsla: ett litet stänk/puff upp ur skålen i ingrediensens egen färg när den
+           landar (mjöl puffar, allt annat stänker) - för hällda saker först när kannan hunnit
+           tömmas (se pour-animationen nedan), annars direkt. */
+        var em = step.ingredient ? step.ingredient.em : "",
+          splashCol =
+            { "🥛": "#fffdf6", "🥚": "#f4c13d", "🧈": "#f7dc7a", "🫐": "#5b4a9b", "🌾": "#f8f3e6" }[em] || "#fffdf6",
+          bowlR = bowl.getBoundingClientRect();
+        setTimeout(
+          function () {
+            kitBits(
+              stage,
+              bowlR.left + bowlR.width / 2,
+              bowlR.top + bowlR.height * 0.3,
+              em === "🌾" ? 6 : 7,
+              em === "🌾" ? "flour" : "drop",
+              em === "🌾" ? 40 : 34,
+              em === "🌾" ? 16 : 4,
+              splashCol,
+            );
+          },
+          step.ingredient && step.ingredient.pour ? 380 : 0,
+        );
         var advanceDelay = 350;
         if (step.ingredient && step.ingredient.pour) {
           /* buggrapport (x2): såg fortfarande ut som att man lade hela mjölkkannan i skålen -
@@ -10685,20 +10796,146 @@
      medurs/moturs). Ett barn som tycker cirklandet är kul och fortsätter väldigt länge får en
      jättepannkaka istället för kringeldeg - den "typiska" överdriften ger ett eget roligt
      resultat, inte ett straff. */
+  /* sega: det man faktiskt lagt i skålen tidigare i receptet (bär, ägg, mjölk, socker,
+     kardemumma...) ligger kvar som klumpar i smeten och blandas synligt in medan man rör -
+     samma kontinuitet som att puista-kornen har ingrediensens egen färg. */
+  function kitBowlLumps() {
+    var out = [],
+      steps = KT.recipe.steps,
+      i;
+    for (i = 0; i < KT.stepIdx; i++) {
+      var s = steps[i];
+      if (s.verb === "vala" && s.ingredient) {
+        var em = s.ingredient.em;
+        /* "Vala kolm marja kaussi" - tre bär, alltså tre klumpar */
+        if (em === "🫐") out.push("#4b3f8f", "#5b4a9b", "#433677");
+        else if (em === "🥚") out.push("#f4c13d");
+        else if (em === "🥛") out.push("#fffaf0");
+        else if (em === "🧈") out.push("#f7dc7a");
+        else if (em === "🌾") out.push("#fbf6ea");
+      } else if (s.verb === "puista") out.push(s.grainColor === "brown" ? "#8a5a2b" : "#ffffff");
+    }
+    return out.length ? out : ["#fffaf0", "#f4c13d"];
+  }
+  /* virveln i smeten: en tvåarmad spiral (SVG) som roteras med sleven och plattas till i
+     perspektiv (se .kitswirl) - den ikoniska "omrörd"-bilden. */
+  function kitSwirlSvg() {
+    var d = "",
+      arm,
+      t;
+    for (arm = 0; arm < 2; arm++) {
+      for (t = 0; t <= 40; t++) {
+        /* drygt ett varv per arm - fler varv än så plattades till koncentriska "måltavle-
+           ringar" i perspektivet istället för en virvel */
+        var f = t / 40,
+          th = arm * Math.PI + f * Math.PI * 2.3,
+          rad = 5 + f * 43;
+        d += (t ? "L" : "M") + (50 + Math.cos(th) * rad).toFixed(1) + " " + (50 + Math.sin(th) * rad).toFixed(1);
+      }
+    }
+    return (
+      '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="' +
+      d +
+      '" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="5" stroke-linecap="round"/></svg>'
+    );
+  }
   function kitchenSetupSega() {
     var stage = document.getElementById("kitstage");
     stage.innerHTML =
       '<img class="kitbowl kitbowl--stir" id="kitbowl" src="/images/kitchen/skal.webp" alt="">' +
+      '<div class="kitbatter" id="kitbatter"><div class="kitbattertint" id="kitbattertint"></div>' +
+      '<div class="kitswirl" id="kitswirl">' +
+      kitSwirlSvg() +
+      "</div></div>" +
       '<img class="kitspoon" id="kitspoon" src="/images/kitchen/slev.webp" alt="">' +
       '<div class="kitturns" id="kitturns">0 varv</div>';
     var bowl = document.getElementById("kitbowl"),
       spoon = document.getElementById("kitspoon"),
+      batter = document.getElementById("kitbatter"),
+      swirl = document.getElementById("kitswirl"),
+      tint = document.getElementById("kitbattertint"),
       total = 0,
       lastAngle = null,
       down = false,
       MIN_TURNS = 0.4,
-      MAX_TURNS = 3;
+      MAX_TURNS = 3,
+      /* spelkänsla (sega hade inget ljud alls och ingen förändring i skålen, bara en siffra):
+         signed = riktad vinkel (virveln snurrar ÅT DET HÅLL man rör), stepAcc = vinkel sedan
+         förra tonen, phase 0 klumpig -> 1 slät (Klar) -> 2 rinnig (pannkaka på väg). */
+      signed = 0,
+      stepAcc = 0,
+      steps = 0,
+      lastT = 0,
+      phase = 0,
+      lumps = [],
+      lumpCols = kitBowlLumps(),
+      i;
     spoon.style.touchAction = "none";
+    /* blandas bär i blir smeten lila, ägg gör den gul - annars bara slätare/glansigare */
+    tint.style.background =
+      lumpCols.indexOf("#5b4a9b") !== -1 ? "#9a83cf" : lumpCols.indexOf("#f4c13d") !== -1 ? "#f2c75a" : "transparent";
+    for (i = 0; i < lumpCols.length; i++) {
+      var lump = document.createElement("span");
+      lump.className = "kitlump";
+      lump.style.background = lumpCols[i];
+      batter.appendChild(lump);
+      lumps.push({ el: lump, a: (i / lumpCols.length) * Math.PI * 2 + 0.5, r: 0.38 + ((i * 37) % 45) / 100 });
+    }
+    /* ritar smeten utifrån hur mycket som rörts: klumparna kretsar med virveln, dras inåt och
+       smälter bort fram till Klar-gränsen (MIN_TURNS), virveln blir tydligare ju slätare
+       smeten är. Virveln släpar en aning efter sleven (transition på .kitswirl) - som vätska. */
+    function drawBatter() {
+      var turns = total / (2 * Math.PI),
+        blend = Math.min(1, turns / MIN_TURNS),
+        k;
+      swirl.style.transform = "scaleY(0.27) rotate(" + ((signed * 180) / Math.PI).toFixed(1) + "deg)";
+      swirl.style.opacity = (0.16 + blend * 0.5).toFixed(2);
+      tint.style.opacity = (blend * 0.4).toFixed(2);
+      for (k = 0; k < lumps.length; k++) {
+        var L = lumps[k],
+          a = L.a + signed * 1.15,
+          rr = L.r * (1 - blend * 0.55),
+          left = 52 + Math.cos(a) * rr * 44,
+          top = 14 + Math.sin(a) * rr * 10;
+        L.el.style.left = left.toFixed(1) + "px";
+        L.el.style.top = top.toFixed(1) + "px";
+        /* smälter i lite olika takt (organiskt), men ALLA är helt borta senast vid Klar-gränsen */
+        L.el.style.scale = Math.max(0, 1 - blend * (1 + k * 0.08)).toFixed(2);
+      }
+    }
+    drawBatter();
+    /* en ton per åttondels varv - fortare omrörning = tätare toner, precis som puistas toner
+       följer skakandet. Två toner som gungar (grundton, sedan två steg upp - som smet som
+       skvalpar) och hela gungan klättrar uppåt ju fler varv som rörts. Över MAX_TURNS
+       (pannkaka) blir tonerna låga, mjuka "blubb" istället - man HÖR att smeten blivit rinnig. */
+    function stirStep(speed) {
+      steps++;
+      var turns = total / (2 * Math.PI);
+      if (phase === 2) {
+        tone(kitJit(kitNote(4 - (steps % 4), 196)), 0.09, 0, "triangle");
+      } else {
+        var base = Math.min(8, Math.floor((turns / MAX_TURNS) * 9));
+        tone(kitJit(kitNote(base + (steps % 2) * 2, 392)), 0.06, 0);
+      }
+      /* belöna kraftig omrörning: rör man riktigt fort stänker det lite smet över kanten */
+      if (speed > 9) {
+        var br = batter.getBoundingClientRect(),
+          sr = spoon.getBoundingClientRect(),
+          bcx = br.left + br.width / 2,
+          bcy = br.top + br.height / 2,
+          ang = Math.atan2(sr.top + sr.height / 2 - bcy, sr.left + sr.width / 2 - bcx);
+        kitBits(
+          stage,
+          bcx + Math.cos(ang) * br.width * 0.45,
+          bcy + Math.sin(ang) * br.height * 0.45,
+          2,
+          "drop",
+          26,
+          6,
+          "#ecd6a4",
+        );
+      }
+    }
     /* buggrapport (upprepad, x2): sleven kändes konstig oavsett hur omloppsellipsen justerades
        - grundbugg var att sleven INTE följde fingret, bara VINKELN från fingret till skålens
        mitt; avståndet ignorerades helt och sleven tvingades till en fast osynlig bana. Det
@@ -10746,6 +10983,7 @@
       down = true;
       spoon.setPointerCapture(e.pointerId);
       lastAngle = angleFor(e);
+      lastT = performance.now();
     });
     spoon.addEventListener("pointermove", function (e) {
       if (!down) return;
@@ -10754,10 +10992,40 @@
       if (d > Math.PI) d -= 2 * Math.PI;
       if (d < -Math.PI) d += 2 * Math.PI;
       total += Math.abs(d);
+      signed += d;
+      stepAcc += Math.abs(d);
       lastAngle = a;
       placeSpoon(e);
-      document.getElementById("kitturns").textContent = (total / (2 * Math.PI)).toFixed(1) + " varv";
-      if (total / (2 * Math.PI) >= MIN_TURNS) showContinue();
+      var now = performance.now(),
+        speed = Math.abs(d) / (Math.max(8, now - lastT) / 1000),
+        turns = total / (2 * Math.PI);
+      lastT = now;
+      if (stepAcc >= Math.PI / 4) {
+        stepAcc = 0;
+        stirStep(speed);
+      }
+      drawBatter();
+      document.getElementById("kitturns").textContent = turns.toFixed(1) + " varv";
+      if (turns >= MIN_TURNS) showContinue();
+      /* klumparna har just smält bort = smeten är klar: samma "nu räcker det"-glitter som de
+         andra momenten, och smeten får en blank yta. */
+      if (phase === 0 && turns >= MIN_TURNS) {
+        phase = 1;
+        batter.classList.add("kit-smooth");
+        kitReady(stage, batter);
+      }
+      /* för länge omrört: smeten flyter ut (bredare, plattare, gyllnare - en pannkaka på väg)
+         och en vinglig nedåtglidning i ljudet. Ingen varning eller rött kryss - pannkakan är
+         ett eget roligt resultat (recipe.miss.sega) - men nu känns det som en FÖLJD av att man
+         rörde länge, inte som en slumpmässig överraskning efteråt. */
+      if (phase === 1 && turns > MAX_TURNS) {
+        phase = 2;
+        batter.classList.add("kit-runny");
+        tone(587, 0.09, 0, "triangle");
+        tone(659, 0.09, 0.08, "triangle");
+        tone(494, 0.1, 0.16, "triangle");
+        tone(392, 0.24, 0.25, "triangle");
+      }
     });
     spoon.addEventListener("pointerup", function () {
       down = false;
@@ -10772,13 +11040,21 @@
   function kitchenSetupSotku() {
     var stage = document.getElementById("kitstage");
     stage.innerHTML =
-      '<div class="kitdough" id="kitdough"><img class="kitdoughimg" src="/images/kitchen/deg.webp" alt=""></div>' +
+      '<div class="kitdough kitdough--knead" id="kitdough"><img class="kitdoughimg" src="/images/kitchen/deg.webp" alt=""></div>' +
       '<div class="kitturns" id="kitcount">0.0 s</div>';
     var dough = document.getElementById("kitdough"),
       total = 0,
       pressStart = 0,
       pressing = false,
       MIN_MS = 1200,
+      /* spelkänsla: att bara hålla fingret stilla på en ihoptryckt deg var död tid - inget
+         ljud, ingen rörelse. Nu "knådar" degen i takt (en puls per PULSE_MS hålltid): den
+         trycks till lite extra, mjöl puffar ut vid kanterna och en mjuk ton klättrar för varje
+         puls - man hör att det byggs upp, som puistas toner. pulses räknas på den SAMMANLAGDA
+         hålltiden, så man kan släppa och fortsätta utan att takten börjar om. */
+      PULSE_MS = 360,
+      pulses = 0,
+      ready = false,
       raf;
     /* .kitdough delas med loika (korta tryck) där "manipulation" duger - ett HÅLLET tryck på
        över en sekund är känsligare för att webbläsaren tolkar det som en panorering/scroll-
@@ -10793,11 +11069,33 @@
         kitchenAdvance(false);
       };
     }
+    function kneadPulse() {
+      dough.classList.remove("kit-knead");
+      void dough.offsetWidth;
+      dough.classList.add("kit-knead");
+      tone(kitJit(kitNote(Math.min(pulses - 1, 9), 220)), 0.1, 0, "triangle");
+      var dr = dough.getBoundingClientRect();
+      kitBits(stage, dr.left + 10, dr.bottom - 14, 2, "flour", 24, 6);
+      kitBits(stage, dr.right - 10, dr.bottom - 14, 2, "flour", 24, 6);
+      buzz(8);
+    }
     function tick() {
       if (!pressing) return;
       var countEl = document.getElementById("kitcount");
       if (!countEl) return;
-      countEl.textContent = ((total + (Date.now() - pressStart)) / 1000).toFixed(1) + " s";
+      var held = total + (Date.now() - pressStart),
+        p = Math.floor(held / PULSE_MS);
+      countEl.textContent = (held / 1000).toFixed(1) + " s";
+      if (p > pulses) {
+        pulses = p;
+        kneadPulse();
+      }
+      /* gränsen nås medan man håller: glitter + Klar direkt, inte först när man släpper */
+      if (!ready && held >= MIN_MS) {
+        ready = true;
+        kitReady(stage, dough);
+        showContinue();
+      }
       raf = requestAnimationFrame(tick);
     }
     /* spelkänsla/konsekvens: sõtku var det ENDA momentet utan setPointerCapture, och förlitade
@@ -10810,8 +11108,12 @@
     dough.addEventListener("pointerdown", function (e) {
       pressing = true;
       pressStart = Date.now();
+      dough.classList.remove("kit-boing");
       dough.classList.add("kit-squish");
       dough.setPointerCapture(e.pointerId);
+      /* tryck = en mjuk duns (lågt, triangelvåg - hörs även i en surfplattas små högtalare) */
+      tone(kitJit(247), 0.07, 0, "triangle");
+      buzz(10);
       tick();
     });
     function endPress() {
@@ -10819,7 +11121,14 @@
       pressing = false;
       if (raf) cancelAnimationFrame(raf);
       total += Date.now() - pressStart;
-      dough.classList.remove("kit-squish");
+      /* släpp = degen fjädrar tillbaka med en gelé-studs (kit-boing, översvängning åt andra
+         hållet innan den lägger sig) och ett litet uppåtgående "blopp" - varje enskilt tryck
+         blir roligt i sig, inte bara den ackumulerade tiden. */
+      dough.classList.remove("kit-squish", "kit-knead");
+      void dough.offsetWidth;
+      dough.classList.add("kit-boing");
+      tone(kitJit(392), 0.05, 0);
+      tone(kitJit(523), 0.08, 0.045);
       document.getElementById("kitcount").textContent = (total / 1000).toFixed(1) + " s";
       if (total >= MIN_MS) showContinue();
     }
@@ -10829,15 +11138,46 @@
   /* puhkamine: inget att göra - en kort, odömande väntestund medan degen jäser. Ingen
      gradering, ingen gest, bara en liten paus med en rolig "puffar upp"-animation innan man
      går vidare - ett andningshål mellan alla de aktiva momenten. */
+  /* spelkänsla: väntan var helt död - en stillastående bild i 1,7 s och sedan en enda ton.
+     Nu andas degen (kit-breathe) och växer en aning för varje jäsbubbla som stiger upp och
+     spricker med ett litet "blupp" (stigande toner - det byggs upp mot något), sedan en kort
+     ihoptryckning precis innan den puffar upp (förväntan före belöningen) och puffen själv
+     fjädrar förbi sin slutstorlek innan den lägger sig (se .kitrise, style.css). Samma
+     totala väntetid som förut - det är fortfarande ett andningshål, bara inte dött. */
   function kitchenSetupPuhkamine() {
     var stage = document.getElementById("kitstage");
     stage.innerHTML =
-      '<img class="kitrise" id="kitrise" src="/images/kitchen/deg.webp" alt="">' +
+      '<img class="kitrise kit-breathe" id="kitrise" src="/images/kitchen/deg.webp" alt="">' +
       '<div class="kithint">Degen vilar och jäser …</div>';
-    var rise = document.getElementById("kitrise");
+    var rise = document.getElementById("kitrise"),
+      bubbles = 0;
+    function bubble() {
+      if (!rise.isConnected || bubbles >= 5) return;
+      bubbles++;
+      rise.style.scale = String(1 + bubbles * 0.04);
+      var rr = rise.getBoundingClientRect();
+      kitBits(stage, rr.left + rr.width * (0.3 + Math.random() * 0.4), rr.top + rr.height * 0.4, 1, "bubble", 10, 34);
+      tone(kitJit(kitNote(bubbles, 392)), 0.05, 0);
+      tone(kitJit(kitNote(bubbles + 2, 392)), 0.05, 0.04);
+      setTimeout(bubble, 230 + Math.random() * 90);
+    }
+    setTimeout(bubble, 160);
     setTimeout(function () {
+      if (!rise.isConnected) return;
+      rise.classList.add("kit-anticipate");
+    }, 1540);
+    setTimeout(function () {
+      if (!rise.isConnected) return;
+      rise.classList.remove("kit-breathe", "kit-anticipate");
+      rise.style.scale = "";
       rise.classList.add("kit-risen");
-      tone(520, 0.1, 0);
+      /* "fwoomp": tre snabba toner uppåt istället för en ensam pip */
+      tone(330, 0.08, 0, "triangle");
+      tone(494, 0.08, 0.06, "triangle");
+      tone(784, 0.18, 0.12);
+      buzz(14);
+      var rr = rise.getBoundingClientRect();
+      kitBits(stage, rr.left + rr.width / 2, rr.top + rr.height * 0.75, 8, "flour", 70, 4);
       var c = document.getElementById("kitcontinue");
       c.innerHTML = '<button class="btn green big wide" id="kitdone">Nu är den klar! ✅</button>';
       document.getElementById("kitdone").onclick = function () {
@@ -10859,7 +11199,18 @@
       dragging = false,
       lastX = 0,
       total = 0,
-      MIN_PX = 260;
+      MIN_PX = 260,
+      /* spelkänsla (rulli var helt tyst): dir/strokeLen hittar varje vändning fram-och-
+         tillbaka (ett "drag" med kaveln, som i verkligheten), tickAcc ger ett lågt trä-knatter
+         i takt med rörelsen - bara medan kaveln faktiskt är på degen, så tystnaden vid sidan om
+         säger direkt att det inte räknas. */
+      dir = 0,
+      strokeLen = 0,
+      revAcc = 0,
+      strokes = 0,
+      tickAcc = 0,
+      ready = false,
+      tiltT = null;
     pin.style.touchAction = "none";
     function showContinue() {
       var c = document.getElementById("kitcontinue");
@@ -10869,16 +11220,44 @@
         kitchenAdvance(false);
       };
     }
+    /* ett fullbordat drag: en duns som stiger i ton för varje drag (tunnare deg = ljusare
+       ton), degen trycks till och breder ut sig en aning (kit-roll), och mjöl yr upp vid den
+       ände där kaveln vände. */
+    function rollStroke(d) {
+      strokes++;
+      tone(kitJit(kitNote(Math.min(strokes - 1, 9), 196)), 0.11, 0, "triangle");
+      flat.classList.remove("kit-roll");
+      void flat.offsetWidth;
+      flat.classList.add("kit-roll");
+      var pr = pin.getBoundingClientRect();
+      kitBits(stage, d > 0 ? pr.right - 16 : pr.left + 16, pr.bottom - 4, 3, "flour", 24, 6);
+      buzz(8);
+    }
+    function untilt() {
+      clearTimeout(tiltT);
+      tiltT = setTimeout(function () {
+        pin.style.rotate = "0deg";
+      }, 110);
+    }
+    function resetStroke() {
+      dir = 0;
+      strokeLen = 0;
+      revAcc = 0;
+    }
     pin.addEventListener("pointerdown", function (e) {
       dragging = true;
       pin.setPointerCapture(e.pointerId);
       lastX = e.clientX;
+      resetStroke();
     });
     pin.addEventListener("pointermove", function (e) {
       if (!dragging) return;
       var r = stage.getBoundingClientRect();
       var p = kitClampPos(stage, pin, e.clientX - r.left - 65, 0);
-      pin.style.left = p.left + "px";
+      /* buggfix: kitClampPos räknar på kavelns SYNLIGA vänsterkant, men .kitpin har
+         translateX(-50%) - utan att lägga tillbaka halva bredden hamnade kavelns mitt 65 px
+         till vänster om fingret (drog man åt höger första gången hoppade den åt VÄNSTER). */
+      pin.style.left = p.left + pin.offsetWidth / 2 + "px";
       /* buggrapport: "du rullar kaveln vid sidan, borde bara räknas på degen" - rörelse
          räknades tidigare var som helst i rutan, inte bara när kaveln faktiskt var över degen.
          Räknar nu bara när kaveln är nära degen (kitNear), som määri mot bre-ut-ytan - degens
@@ -10887,21 +11266,65 @@
         pcx = pr.left + pr.width / 2,
         pcy = pr.top + pr.height / 2;
       if (!kitNear(flat, pcx, pcy, 25)) {
+        /* barn rullar gärna förbi degens kant innan de vänder - ett drag som rullar ut över
+           kanten är ett fullbordat drag, inte ett avbrutet */
+        if (dir && strokeLen >= 24) rollStroke(dir);
         lastX = e.clientX;
+        resetStroke();
         return;
       }
-      total += Math.abs(e.clientX - lastX);
+      var dx = e.clientX - lastX,
+        adx = Math.abs(dx);
+      total += adx;
       lastX = e.clientX;
       var frac = Math.min(1, total / MIN_PX);
       document.getElementById("kitcount").textContent = Math.round(frac * 100) + "%";
-      flat.style.transform = "scaleX(" + (1 + frac * 0.7) + ") scaleY(" + (1 - frac * 0.35) + ")";
+      /* buggfix: translateX(-50%) måste vara kvar (centreringen i .kitdoughflat) - utan den
+         hoppade degen 55 px åt höger så fort man började kavla, bort från kaveln. */
+      flat.style.transform = "translateX(-50%) scaleX(" + (1 + frac * 0.7) + ") scaleY(" + (1 - frac * 0.35) + ")";
+      /* kaveln lutar sig in i rörelsen (som när man trycker den framför sig) */
+      pin.style.rotate = Math.max(-6, Math.min(6, dx * 0.5)).toFixed(1) + "deg";
+      untilt();
+      tickAcc += adx;
+      if (tickAcc >= 24) {
+        tickAcc = 0;
+        tone(kitJit(170 + frac * 140), 0.03, 0, "triangle");
+      }
+      /* vändning = ett drag klart. Hysteres: rörelsen bakåt måste bli minst 8 px innan den
+         räknas som en vändning (och draget innan måste ha varit minst 24 px) - annars blev
+         varje litet darr/ryck i ett barns hand ett extra "drag" med ljud och mjölpuff. */
+      var nd = dx > 0 ? 1 : dx < 0 ? -1 : 0;
+      if (nd) {
+        if (!dir) dir = nd;
+        if (nd === dir) {
+          strokeLen += adx;
+          revAcc = 0;
+        } else {
+          revAcc += adx;
+          if (revAcc >= 8) {
+            if (strokeLen >= 24) rollStroke(dir);
+            dir = nd;
+            strokeLen = revAcc;
+            revAcc = 0;
+          }
+        }
+      }
       if (total >= MIN_PX) showContinue();
+      if (!ready && total >= MIN_PX) {
+        ready = true;
+        kitReady(stage, flat);
+      }
     });
+    /* lyfter man kaveln mitt i ett långt drag räknas det också som ett drag */
     pin.addEventListener("pointerup", function () {
+      if (dragging && dir && strokeLen >= 40) rollStroke(dir);
       dragging = false;
+      resetStroke();
+      pin.style.rotate = "0deg";
     });
     pin.addEventListener("pointercancel", function () {
       dragging = false;
+      pin.style.rotate = "0deg";
     });
   }
   /* määri: svep ett verktyg (bred ut smör eller pensla ägg - samma gest, olika steg-text)
@@ -10942,6 +11365,7 @@
       surfaceH +
       'px">' +
       '<div class="kitspreadfill" id="kitspreadfill"></div>' +
+      '<div class="kitspreadfx" id="kitspreadfx"></div>' +
       "</div>" +
       '<img class="kitbrush" id="kitbrush" src="' +
       toolSrc +
@@ -10954,23 +11378,53 @@
     var brush = document.getElementById("kitbrush"),
       spread = document.getElementById("kitspread"),
       fill = document.getElementById("kitspreadfill"),
+      fx = document.getElementById("kitspreadfx"),
       dragging = false,
       lastX = 0,
       lastY = 0,
       total = 0,
-      MIN_PX = 320;
+      MIN_PX = 320,
+      /* spelkänsla (määri hade inget ljud, bara en opacitet som långsamt steg): en blank
+         smet-strimma blir kvar en stund precis där verktyget drogs, en mjuk ton i takt med
+         rörelsen som kliver uppåt för varje tiondel som täcks, och verktyget lutar sig in i
+         draget. tickAcc = sträcka sedan förra tonen/strimman. */
+      tickAcc = 0,
+      ready = false,
+      tiltT = null,
+      smearCol = isVoi ? "#f8e08a" : "#f3b640",
+      mk;
     brush.style.touchAction = "none";
     /* spelkänsla: en rektangulär guldplatta ovanpå den runda degen/bullarna såg fel ut vid hög
        opacitet - maskar glansen mot SAMMA bild som ytan, så den bara syns där maten faktiskt
-       har pixlar (degens/bullarnas egen form), inte hela den fyrkantiga bildrutan. */
-    fill.style.webkitMaskImage = "url(" + surfaceSrc + ")";
-    fill.style.maskImage = "url(" + surfaceSrc + ")";
-    fill.style.webkitMaskSize = "contain";
-    fill.style.maskSize = "contain";
-    fill.style.webkitMaskRepeat = "no-repeat";
-    fill.style.maskRepeat = "no-repeat";
-    fill.style.webkitMaskPosition = "center";
-    fill.style.maskPosition = "center";
+       har pixlar (degens/bullarnas egen form), inte hela den fyrkantiga bildrutan. Samma mask
+       på strimlagret (fx), så att strimmorna och slutglansen aldrig hamnar utanför maten. */
+    for (mk = 0; mk < 2; mk++) {
+      var layer = mk ? fx : fill;
+      layer.style.webkitMaskImage = "url(" + surfaceSrc + ")";
+      layer.style.maskImage = "url(" + surfaceSrc + ")";
+      layer.style.webkitMaskSize = "contain";
+      layer.style.maskSize = "contain";
+      layer.style.webkitMaskRepeat = "no-repeat";
+      layer.style.maskRepeat = "no-repeat";
+      layer.style.webkitMaskPosition = "center";
+      layer.style.maskPosition = "center";
+    }
+    /* x/y i skärmkoordinater -> lokala koordinater i den (skalade) ramen, så strimman hamnar
+       under verktyget även när degen är utdragen med scaleX/scaleY (smör-steget). */
+    function smear(x, y) {
+      if (kitCalmMQ && kitCalmMQ.matches) return;
+      var sr = spread.getBoundingClientRect(),
+        s = document.createElement("div");
+      s.className = "kitsmear";
+      s.style.background = smearCol;
+      s.style.left = ((x - sr.left) / sr.width) * spread.offsetWidth + "px";
+      s.style.top = ((y - sr.top) / sr.height) * spread.offsetHeight + "px";
+      s.style.rotate = Math.round(Math.random() * 40 - 20) + "deg";
+      fx.appendChild(s);
+      setTimeout(function () {
+        s.remove();
+      }, 900);
+    }
     function showContinue() {
       var c = document.getElementById("kitcontinue");
       if (c.firstChild) return;
@@ -11003,19 +11457,40 @@
         lastY = e.clientY;
         return;
       }
-      total += Math.abs(e.clientX - lastX) + Math.abs(e.clientY - lastY);
+      var mdx = e.clientX - lastX,
+        dist = Math.abs(mdx) + Math.abs(e.clientY - lastY);
+      total += dist;
       lastX = e.clientX;
       lastY = e.clientY;
       var frac = Math.min(1, total / MIN_PX);
       document.getElementById("kitcount").textContent = Math.round(frac * 100) + "%";
       fill.style.opacity = frac;
+      brush.style.rotate = Math.max(-8, Math.min(8, mdx * 0.35)).toFixed(1) + "deg";
+      clearTimeout(tiltT);
+      tiltT = setTimeout(function () {
+        brush.style.rotate = "0deg";
+      }, 110);
+      tickAcc += dist;
+      if (tickAcc >= 24) {
+        tickAcc = 0;
+        tone(kitJit(kitNote(Math.min(9, Math.floor(frac * 10)), 392)), 0.035, 0, "triangle");
+        smear(bcx, bcy);
+      }
       if (total >= MIN_PX) showContinue();
+      /* helt täckt: en blank glans sveper över ytan (kit-glaze) + "nu räcker det"-glittret */
+      if (!ready && total >= MIN_PX) {
+        ready = true;
+        fx.classList.add("kit-glaze");
+        kitReady(stage, spread);
+      }
     });
     brush.addEventListener("pointerup", function () {
       dragging = false;
+      brush.style.rotate = "0deg";
     });
     brush.addEventListener("pointercancel", function () {
       dragging = false;
+      brush.style.rotate = "0deg";
     });
   }
   /* loika: upprepade tryck. För få hack lämnar degen som en stor klump (en egen rolig
@@ -11054,6 +11529,14 @@
       void scraper.offsetWidth;
       scraper.classList.add("kit-chop");
       tone(300 + count * 20, 0.05, 0);
+      /* spelkänsla: hacket hade redan ljud + rörelse + stigande ton (samma byggstenar som
+         puista) och är oförändrat - men gränsen MIN_CHOPS (färre hack = "stor knut") syntes
+         aldrig, Klar dyker upp redan efter första hacket. Samma "nu räcker det"-glitter som
+         alla andra moment när gränsen nås, plus några degsmulor som flyger vid varje hugg. */
+      var sr = scraper.getBoundingClientRect();
+      kitBits(stage, sr.left + sr.width / 2, sr.bottom - 6, 3, "drop", 22, 2, "#ecd9b0");
+      buzz(10);
+      if (count === MIN_CHOPS) kitReady(stage, dough);
       showContinue();
     });
   }
@@ -11079,16 +11562,36 @@
       knot = document.getElementById("kitknot"),
       dragging = false,
       startLeft = rope.offsetLeft,
-      startTop = rope.offsetTop;
+      startTop = rope.offsetTop,
+      /* spelkänsla: draget fram till knuten var helt tyst och oförändrat tills man släppte -
+         ingen aning om man var "nära". band = hur nära (0-3) senast, för varmt/kallt-tonerna. */
+      band = 0;
     rope.style.touchAction = "none";
+    /* 0 = långt bort, 1 = ovanpå knuten - mäter mellan mittpunkterna */
+    function warmth() {
+      var rr = rope.getBoundingClientRect(),
+        kr = knot.getBoundingClientRect(),
+        dx = rr.left + rr.width / 2 - (kr.left + kr.width / 2),
+        dy = rr.top + rr.height / 2 - (kr.top + kr.height / 2);
+      return Math.max(0, Math.min(1, 1 - (Math.sqrt(dx * dx + dy * dy) - 50) / 240));
+    }
+    function cool() {
+      kitArm(knot, false);
+      knot.style.scale = "";
+      knot.style.opacity = "";
+    }
     function reset() {
+      rope.classList.add("kit-return");
       rope.style.left = startLeft + "px";
       rope.style.top = startTop + "px";
+      cool();
     }
     rope.addEventListener("pointerdown", function (e) {
       dragging = true;
       rope.setPointerCapture(e.pointerId);
+      rope.classList.remove("kit-return");
       rope.classList.add("kit-dragging");
+      band = Math.floor(warmth() * 4);
     });
     rope.addEventListener("pointermove", function (e) {
       if (!dragging) return;
@@ -11096,6 +11599,23 @@
       var p = kitClampPos(stage, rope, e.clientX - r.left - 16, e.clientY - r.top - 30);
       rope.style.left = p.left + "px";
       rope.style.top = p.top + "px";
+      /* varmare/kallare: knuten växer och klarnar ju närmare degen kommer, och varje gång man
+         kliver in i en närmare zon hörs en ton ett steg högre än förra (bara på vägen IN - att
+         dra bort är tyst). Väl inom träffzonen tänds knuten (kitArm) = "släpp nu!". */
+      var w = warmth(),
+        rr = rope.getBoundingClientRect(),
+        rcx = rr.left + rr.width / 2,
+        rcy = rr.top + rr.height / 2,
+        wq = Math.min(3.99, w * 4);
+      knot.style.scale = (1 + w * 0.2).toFixed(3);
+      knot.style.opacity = (0.75 + w * 0.25).toFixed(2);
+      kitArmNear(knot, rcx, rcy, 30);
+      /* zonen sänks först när man dragit en bra bit tillbaka (hysteres) - annars pinglar
+         samma "varmare"-ton om och om igen när handen darrar precis på en zongräns */
+      if (Math.floor(wq) > band) {
+        band = Math.floor(wq);
+        if (!knot.classList.contains("kit-armed")) tone(kitJit(kitNote(band + 1)), 0.05, 0, "triangle");
+      } else if (wq < band - 0.35) band = Math.floor(wq);
     });
     /* se buggrapport-kommentaren i kitchenSetupVala om pointercancel - samma fix här, och
        just detta steg var det som rapporterades "fastna" (se även ompositioneringen ovan). */
@@ -11116,11 +11636,26 @@
         rcy = rr.top + rr.height / 2;
       var hit = kitNear(knot, rcx, rcy, 30);
       if (hit) {
-        knot.classList.add("kit-pop");
-        sndOk();
+        /* degen sugs in i knuten (följer igenom rörelsen istället för att bara bli liggande där
+           den släpptes), och knuten poppar + glittrar i samma ögonblick som den kommer fram. */
+        var kr = knot.getBoundingClientRect(),
+          kcx = kr.left + kr.width / 2,
+          kcy = kr.top + kr.height / 2;
+        rope.style.transition = "transform 0.2s ease-in, opacity 0.2s ease-in";
+        rope.style.transform = "translate(" + (kcx - rcx) + "px," + (kcy - rcy) + "px) scale(0.3)";
+        rope.style.opacity = "0";
         setTimeout(function () {
-          kitchenAdvance(false);
-        }, 350);
+          if (!knot.isConnected) return;
+          knot.classList.remove("kit-armed");
+          knot.style.scale = "";
+          knot.classList.add("kit-pop");
+          sndOk();
+          buzz(20);
+          kitBits(stage, kcx, kcy, 10, "spark", 60, 4);
+        }, 190);
+        setTimeout(function () {
+          if (knot.isConnected) kitchenAdvance(false);
+        }, 560);
       } else {
         reset();
       }
@@ -11130,43 +11665,167 @@
      resultatet (för tidigt/sent = en egen rolig rätt, mitten = perfekt), aldrig om man
      "hann" eller inte. En kort glid-in-i-ugnen-övergång innan själva gräddningsfältet visas,
      så det inte bara hoppar rakt till en eldflamma. */
+  /* ugnen, värmestapeln och knappen - samma uppställning både under inglidningen och under
+     själva gräddningen (hidden = stapel/knapp osynliga men tar fortfarande plats), så att
+     ugnen inte hoppar uppåt i bytet och bakverket landar exakt där det sedan gräddas. */
+  function kitOvenHtml(hidden) {
+    var hide = hidden ? ' style="visibility:hidden"' : "";
+    return (
+      '<div class="kitovenwrap"><img class="kitoven" id="kitoven" src="/images/kitchen/ugn.webp" alt="">' +
+      /* startar blek (rå deg) direkt i markupen - annars syns den ogräddade färgen en bildruta
+         innan bakeLook hinner sätta filtret */
+      '<div class="kitbake" id="kitbake" style="filter:brightness(1.45) saturate(0.35);scale:0.88' +
+      (hidden ? ";opacity:0" : "") +
+      '">🥨</div></div>' +
+      '<div class="kitheatbar" id="kitheatbar"' +
+      hide +
+      '><div class="kitheatfill" id="kitheatfill"></div><div class="kitheatzone"></div></div>' +
+      '<button class="btn green big wide" id="kittake" style="margin-top:12px' +
+      (hidden ? ";visibility:hidden" : "") +
+      '">Ta ut! 🍽️</button>'
+    );
+  }
   function kitchenSetupKupseta() {
     var stage = document.getElementById("kitstage");
     stage.classList.add("kit-oven");
     stage.innerHTML =
-      '<img class="kitoven" src="/images/kitchen/ugn.webp" alt="">' + '<div class="kitslide" id="kitslide">🥨</div>';
-    var slide = document.getElementById("kitslide");
+      kitOvenHtml(true) + '<div class="kitslide" id="kitslide" style="filter:brightness(1.45) saturate(0.35)">🥨</div>';
+    var slide = document.getElementById("kitslide"),
+      target = document.getElementById("kitbake");
+    /* spelkänsla: inglidningen krympte tidigare bara ihop nedanför ugnen och sedan hoppade
+       ugnen upp - nu glider bakverket rakt in i ugnsöppningen och krymper till precis den
+       storlek det har under gräddningen (följer igenom rörelsen in i nästa vy). */
     requestAnimationFrame(function () {
-      slide.classList.add("kit-slide-in");
+      var sr = slide.getBoundingClientRect(),
+        tr = target.getBoundingClientRect(),
+        dx = tr.left + tr.width / 2 - (sr.left + sr.width / 2),
+        dy = tr.top + tr.height / 2 - (sr.top + sr.height / 2);
+      slide.style.transform = "translate(calc(-50% + " + dx + "px), " + dy + "px) scale(" + (30 * 0.88) / 56 + ")";
     });
+    /* ett litet nedåtgående "swoosh" medan plåten glider in */
+    tone(659, 0.07, 0.05, "triangle");
+    tone(494, 0.08, 0.15, "triangle");
+    tone(370, 0.14, 0.26, "triangle");
     setTimeout(kitchenStartBake, 650);
   }
+  /* spelkänsla: gräddningen var en stapel som fylldes i tystnad, och man fick veta först
+     EFTER "Ta ut!" om man prickat rätt - ren tur, ingen skicklighet att lära sig. Nu:
+     - bakverket syns i ugnsöppningen och får färg i realtid: blekt -> gyllene -> mörkt
+     - det perfekta fönstret (LO-HI, samma gränser som förut) är utmärkt på stapeln
+     - elden knastrar, tätare ju varmare det blir
+     - en äggklocke-"ding" + glitter när fönstret öppnar sig, ett lågt "hm" + rök när det stängs
+     - "Ta ut!" fryser bilden ett ögonblick (hit-stop) innan bakverket hoppar ut mot en
+     Inga regler ändrade - fortfarande ingen tidspress, fönstret är lika stort som förut. */
   function kitchenStartBake() {
     var stage = document.getElementById("kitstage");
+    if (!stage) return; /* lämnade skärmen under inglidningen (650 ms-timern ovan) */
     stage.classList.add("kit-oven");
-    stage.innerHTML =
-      '<img class="kitoven" id="kitoven" src="/images/kitchen/ugn.webp" alt="">' +
-      '<div class="kitheatbar"><div class="kitheatfill" id="kitheatfill"></div></div>' +
-      '<button class="btn green big wide" id="kittake" style="margin-top:12px">Ta ut! 🍽️</button>';
+    stage.innerHTML = kitOvenHtml(false);
     var fill = document.getElementById("kitheatfill"),
       oven = document.getElementById("kitoven"),
+      bake = document.getElementById("kitbake"),
+      bar = document.getElementById("kitheatbar"),
       t0 = Date.now(),
       DURATION = 6000,
+      LO = 0.35,
+      HI = 0.75,
+      zone = 0,
+      done = false,
+      nextSmoke = 0,
       raf;
-    /* spelkänsla: en stapel som fylls känns avkopplad från "gräddning" - ugnen själv glöder
-       nu lite starkare ju längre den gräddat, så det faktiskt ser ut som att något händer i
-       ugnen, inte bara en abstrakt tidslinje. */
+    /* bakverkets färg som funktion av tiden: blek rå deg -> gyllenbrun i fönstret -> mörk */
+    function bakeLook(p) {
+      var bright, sat, sep;
+      if (p < LO) {
+        var k = p / LO;
+        bright = 1.45 - k * 0.4;
+        sat = 0.35 + k * 0.85;
+        sep = 0;
+      } else if (p <= HI) {
+        bright = 1.05;
+        sat = 1.2;
+        sep = 0;
+      } else {
+        var k2 = Math.min(1, (p - HI) / (1 - HI));
+        bright = 1.05 - k2 * 0.62;
+        sat = 1.2 - k2 * 0.6;
+        sep = k2 * 0.5;
+      }
+      bake.style.filter =
+        "brightness(" + bright.toFixed(2) + ") saturate(" + sat.toFixed(2) + ") sepia(" + sep.toFixed(2) + ")";
+      bake.style.scale = (0.88 + Math.min(p, HI) * 0.3).toFixed(3);
+    }
+    function zoneChange(z) {
+      var br = bake.getBoundingClientRect();
+      if (z === 1) {
+        /* äggklockan: två ljusa toner som en liten klocka, och fönstret på stapeln lyser */
+        tone(1318.5, 0.45, 0);
+        tone(1975.5, 0.35, 0.01);
+        buzz(15);
+        bar.classList.add("kit-inzone");
+        bake.classList.add("kit-golden");
+        kitBits(stage, br.left + br.width / 2, br.top + br.height / 2, 8, "spark", 44, 8);
+      } else {
+        tone(392, 0.12, 0, "triangle");
+        tone(311, 0.2, 0.1, "triangle");
+        bar.classList.remove("kit-inzone");
+        bake.classList.remove("kit-golden");
+      }
+    }
     function tick() {
+      if (done || !bake.isConnected) return;
       var p = Math.min(1, (Date.now() - t0) / DURATION);
       fill.style.width = p * 100 + "%";
+      /* spelkänsla: en stapel som fylls känns avkopplad från "gräddning" - ugnen själv glöder
+         nu lite starkare ju längre den gräddat, så det faktiskt ser ut som att något händer i
+         ugnen, inte bara en abstrakt tidslinje. */
       oven.style.filter = "brightness(" + (1 + p * 0.35) + ") saturate(" + (1 + p * 0.3) + ")";
-      if (p < 1) raf = requestAnimationFrame(tick);
+      bakeLook(p);
+      var z = p < LO ? 0 : p <= HI ? 1 : 2;
+      if (z !== zone) {
+        zone = z;
+        zoneChange(z);
+      }
+      if (z === 2 && Date.now() > nextSmoke) {
+        nextSmoke = Date.now() + 240;
+        var br = bake.getBoundingClientRect();
+        kitBits(stage, br.left + br.width * (0.3 + Math.random() * 0.4), br.top + 4, 1, "smoke", 14, 46);
+      }
+      raf = requestAnimationFrame(tick);
     }
     raf = requestAnimationFrame(tick);
-    document.getElementById("kittake").onclick = function () {
-      cancelAnimationFrame(raf);
+    /* elden knastrar: korta, slumpade knäpp (som gnistor från veden) - glesa i början och
+       tätare ju varmare ugnen blir. Stannar när bakverket tas ut eller man lämnar skärmen. */
+    function crackle() {
+      if (done || !bake.isConnected) return;
       var p = Math.min(1, (Date.now() - t0) / DURATION);
-      kitchenAdvance(!(p >= 0.35 && p <= 0.75));
+      /* mest små höga knäpp, ibland ett lägre "pop" från en vedbit - glest, det är bakgrund */
+      if (Math.random() < 0.18) tone(kitJit(900 + Math.random() * 300), 0.04, 0, "triangle");
+      else tone(kitJit(2000 + Math.random() * 1200), 0.03, 0, "triangle");
+      if (Math.random() < 0.15 + p * 0.25) tone(kitJit(2400 + Math.random() * 800), 0.03, 0.05, "triangle");
+      setTimeout(crackle, 600 - p * 260 + Math.random() * 340);
+    }
+    setTimeout(crackle, 250);
+    document.getElementById("kittake").onclick = function () {
+      if (done) return;
+      done = true;
+      cancelAnimationFrame(raf);
+      this.disabled = true;
+      var p = Math.min(1, (Date.now() - t0) / DURATION),
+        perfect = p >= LO && p <= HI,
+        br = bake.getBoundingClientRect();
+      /* hit-stop: allt står still och bakverket blixtrar till ett ögonblick, SEN hoppar det ut */
+      bake.style.filter += " brightness(1.7)";
+      tone(523, 0.06, 0, "triangle");
+      tone(784, 0.12, 0.07);
+      if (perfect) kitBits(stage, br.left + br.width / 2, br.top + br.height / 2, 12, "spark", 70, 10);
+      setTimeout(function () {
+        if (!bake.isConnected) return;
+        bake.classList.add("kit-out");
+      }, 90);
+      setTimeout(function () {
+        if (bake.isConnected) kitchenAdvance(!perfect);
+      }, 520);
     };
   }
   function kitchenResult() {
