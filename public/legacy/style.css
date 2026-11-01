@@ -4860,8 +4860,12 @@ body {
   /* kaveln ska rulla OVANPÅ degen (.kitdoughimg) - bottenankrad precis som degen, med ett
      litet fast avstånd, så de alltid möts oavsett rutans höjd. Tidigare var kaveln top-
      ankrad och degen bottenankrad, vilket gjorde att kaveln svävade fritt långt ovanför
-     degen istället för att röra den. */
-  bottom: 53.2%; /* se .kitbowl - samma bänkkant-korrigering */
+     degen istället för att röra den.
+     buggrapport ("ser du inte att den är fel och ovanför skålen?", samma bugg som smeten i
+     .kitbatter): ett RENT procentvärde (% av rutans höjd) driver isär kaveln och degen ju
+     bredare rutan är, eftersom degen/kaveln själva är fast pixelstora bilder som inte växer
+     med rutan. calc() låser kaveln till degens egen bänkkant (39.5%) plus ett FAST avstånd. */
+  bottom: calc(39.5% + 62px);
   left: 50%;
   transform: translateX(-50%);
   transform-origin: 0 50%; /* se .kitbowl - lutningen (rotate, rulli) runt kavelns synliga mitt */
@@ -4905,8 +4909,10 @@ body {
   position: absolute;
   /* inte uppe i hörnet (top/left 20px) som kiting/kitshaker - där hamnade den rakt ovanpå
      hyllans bråte i kökbakgrunden och gick knappt att se eller hitta. Strax ovanför
-     bre-ut-ytan istället, mot en lugnare del av bakgrunden. */
-  bottom: 58.2%; /* se .kitbowl - samma bänkkant-korrigering, hamnar fortsatt strax ovanför .kitspread */
+     bre-ut-ytan istället, mot en lugnare del av bakgrunden.
+     buggrapport: samma bugg som .kitpin/.kitbatter - fast avstånd till .kitspread (39.5%),
+     inte en egen procentandel av rutan, annars glider den bort från bre-ut-ytan på breda rutor. */
+  bottom: calc(39.5% + 85px);
   left: 16px;
   object-fit: contain;
   cursor: grab;
@@ -5085,7 +5091,14 @@ body {
 .kitbatter {
   position: absolute;
   left: 50%;
-  bottom: 44.3%; /* se .kitbowl - samma bänkkant-korrigering, ska synas inne i skålen */
+  /* buggrapport: "ser du inte att den är fel och ovanför skålen?" - ett rent procentvärde
+     (% av RUTANS höjd) är rätt för saker som ligger på bänken (se .kitbowl), men .kitbowl
+     SJÄLV är en fast pixelstor bild (130x85) som inte alls växer med rutan. Smeten måste
+     alltså låsas till skålens EGEN fasta storlek, inte till rutans - annars glider den isär
+     från skålens kant ju bredare rutan är (fungerade vid en bredd, flöt ovanför vid andra,
+     exakt den bugg som gjorde bänkpositionerna fel innan). calc() låser smeten till samma
+     bänkkant som skålen (34.1%) plus ett FAST avstånd (46px) upp till skålens egen kant. */
+  bottom: calc(34.1% + 46px);
   width: 104px;
   height: 28px;
   transform: translateX(-50%);
