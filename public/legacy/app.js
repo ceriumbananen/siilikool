@@ -10560,8 +10560,56 @@
      försöka igen, det finns inget "fel" sätt att till slut få den dit. */
   function kitchenSetupVala(step) {
     var stage = document.getElementById("kitstage");
+    /* buggrapport: "ser man det också i skålen?" - en gång man rört ihop smeten (sega) såg
+       skålen plötsligt tom och blank ut igen så fort man gick vidare till nästa vala-steg
+       (t.ex. smör/mjöl), som att smeten försvunnit. Samma släta smet som sega lämnade efter
+       sig (utan de aktiva klumparna - de är redan upplösta vid blend=1, se kitBowlLumps/
+       kitchenSetupSega) ligger nu kvar synlig i botten resten av receptet. */
+    var segaIdx = -1;
+    KT.recipe.steps.slice(0, KT.stepIdx).forEach(function (s, i) {
+      if (s.verb === "sega") segaIdx = i;
+    });
+    var hasStirred = segaIdx !== -1,
+      batterHtml = "";
+    if (hasStirred) {
+      var priorCols = kitBowlLumps(),
+        tintCol =
+          priorCols.indexOf("#5b4a9b") !== -1
+            ? "#9a83cf"
+            : priorCols.indexOf("#f4c13d") !== -1
+              ? "#f2c75a"
+              : "transparent",
+        /* det som tillkommit EFTER sega (t.ex. smör, mjöl) har inte smälts in i smeten ännu -
+           egna klickar ovanpå, inte bara tintens färg. Byggs på nytt varje steg (inte sparade
+           DOM-noder - de försvinner när stage.innerHTML byts ut till nästa steg) så de alltid
+           är korrekta oavsett vilket steg man faktiskt råkar vara på. */
+        newCols = kitBowlLumps(segaIdx + 1),
+        lumpsHtml = "",
+        li;
+      for (li = 0; li < newCols.length; li++) {
+        var a = (li / Math.max(1, newCols.length)) * Math.PI * 2 + 0.7,
+          r = 0.3 + ((li * 37) % 45) / 100;
+        lumpsHtml +=
+          '<span class="kitlump" style="left:' +
+          (52 + Math.cos(a) * r * 44).toFixed(1) +
+          "px;top:" +
+          (24 + Math.sin(a) * r * 10).toFixed(1) +
+          "px;background:" +
+          newCols[li] +
+          '"></span>';
+      }
+      batterHtml =
+        '<div class="kitbatter kit-smooth" id="kitbatter"><div class="kitbattertint" id="kitbattertint" style="background:' +
+        tintCol +
+        ';opacity:.4"></div><div class="kitswirl" id="kitswirl" style="opacity:.6">' +
+        kitSwirlSvg() +
+        "</div>" +
+        lumpsHtml +
+        "</div>";
+    }
     stage.innerHTML =
       '<img class="kitbowl" id="kitbowl" src="/images/kitchen/skal.webp" alt="">' +
+      batterHtml +
       (step.ingredient && step.ingredient.img
         ? '<img class="kiting' +
           (step.ingredient.pour ? " kit-pour" : "") +
@@ -10571,6 +10619,7 @@
         : '<div class="kiting" id="kiting">' + (step.ingredient ? step.ingredient.em : "🫐") + "</div>");
     var ing = document.getElementById("kiting"),
       bowl = document.getElementById("kitbowl"),
+      batter = document.getElementById("kitbatter"),
       dragging = false,
       startLeft = ing.offsetLeft,
       startTop = ing.offsetTop;
@@ -10649,6 +10698,19 @@
               em === "🌾" ? 16 : 4,
               splashCol,
             );
+            /* samma "ligger kvar i skålen"-princip som batterns tint ovan - det nya tillskottet
+               (smör/mjöl m.m.) blir en egen liten klick som stannar synlig i smeten, inte bara
+               ett stänk som försvinner på en bildruta. */
+            if (batter) {
+              var lump = document.createElement("span"),
+                a = Math.random() * Math.PI * 2,
+                r = 0.25 + Math.random() * 0.4;
+              lump.className = "kitlump";
+              lump.style.background = splashCol;
+              lump.style.left = (52 + Math.cos(a) * r * 44).toFixed(1) + "px";
+              lump.style.top = (14 + Math.sin(a) * r * 10 + 10).toFixed(1) + "px";
+              batter.appendChild(lump);
+            }
           },
           step.ingredient && step.ingredient.pour ? 380 : 0,
         );
@@ -10799,11 +10861,15 @@
   /* sega: det man faktiskt lagt i skålen tidigare i receptet (bär, ägg, mjölk, socker,
      kardemumma...) ligger kvar som klumpar i smeten och blandas synligt in medan man rör -
      samma kontinuitet som att puista-kornen har ingrediensens egen färg. */
-  function kitBowlLumps() {
+  /* fromIdx: valfritt startindex (default 0) - kitchenSetupVala återanvänder denna för att
+     bygga klickar bara för det som tillkommit EFTER sega (se den buggrapport-kommentaren),
+     utan standard-reservfärgerna nedan (de ska bara gälla hela receptets historik). */
+  function kitBowlLumps(fromIdx) {
     var out = [],
       steps = KT.recipe.steps,
+      start = fromIdx || 0,
       i;
-    for (i = 0; i < KT.stepIdx; i++) {
+    for (i = start; i < KT.stepIdx; i++) {
       var s = steps[i];
       if (s.verb === "vala" && s.ingredient) {
         var em = s.ingredient.em;
@@ -10815,7 +10881,7 @@
         else if (em === "🌾") out.push("#fbf6ea");
       } else if (s.verb === "puista") out.push(s.grainColor === "brown" ? "#8a5a2b" : "#ffffff");
     }
-    return out.length ? out : ["#fffaf0", "#f4c13d"];
+    return out.length || start ? out : ["#fffaf0", "#f4c13d"];
   }
   /* virveln i smeten: en tvåarmad spiral (SVG) som roteras med sleven och plattas till i
      perspektiv (se .kitswirl) - den ikoniska "omrörd"-bilden. */
