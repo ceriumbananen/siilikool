@@ -4334,13 +4334,19 @@ body {
 /* ---------- Siiri köök (kitchenIntro/kitchenStep m.fl., app.js) ---------- */
 .kitstage {
   position: relative;
-  height: 440px;
+  /* buggrapport: fast height + background-size:cover beskär bilden olika mycket beroende på
+     hur bred rutan råkar vara (cover skalar efter vilken axel som behöver mest för att täcka,
+     och det ändras med bredden) - skålen/degen/kaveln m.fl. (fasta bottom:px-värden nedan)
+     hamnade därför rätt bara vid EN specifik fönsterbredd, fel på andra. aspect-ratio låst
+     till bildens egna mått tar bort beskärningen helt - bilden visas alltid hel, oavsett
+     bredd, så procentbaserade bottom-värden alltid landar på samma ställe i bilden. */
+  aspect-ratio: 1376 / 768;
   margin: 12px 0;
   border-radius: var(--r-md);
   overflow: hidden;
   background-image: url("/images/kitchen/kokscen.webp");
   background-size: cover;
-  background-position: center 65%;
+  background-position: center;
   /* steg utan absolutpositionerade element (sõtku/loika/puhkamine/kupseta) flyter annars upp
      i toppen och lämnar ett stort tomt område under sig i den högre rutan - centrera dem
      istället. Påverkar inte de absolutpositionerade elementen (skål, degring, kavel m.fl.). */
@@ -4376,9 +4382,10 @@ body {
   left: 50%;
   /* buggrapport: skålen stod till stor del nere i skåpluckorna, inte uppe på bänkskivan -
      det nya närbilds-köksfotot (kokscen.webp) har bänkskivans framkant mycket högre upp i
-     bilden än den gamla bakgrunden hade. 150px = i linje med kannan/de staplade skålarna
-     som redan är målade på bänken (uppmätt mot bakgrundens egen bänkkant, inte gissat). */
-  bottom: 150px;
+     bilden än den gamla bakgrunden hade. 34.1% = i linje med kannan/de staplade skålarna
+     som redan är målade på bänken (uppmätt mot bakgrundens egen bänkkant, inte gissat).
+     Procent, inte px - se kommentaren på .kitstage om varför. */
+  bottom: 34.1%;
   transform: translateX(-50%);
   /* spelkänsla: scale/rotate (kit-pop, kit-armed) vrider runt transform-origin INNAN
      translateX(-50%) - med standardmitten låg vridpunkten en halv bredd bredvid den synliga
@@ -4662,7 +4669,7 @@ body {
 .kitknot {
   position: absolute;
   left: 50%;
-  bottom: 150px; /* se .kitbowl - samma bänkkant-korrigering, samma siffra */
+  bottom: 34.1%; /* se .kitbowl - samma bänkkant-korrigering, samma siffra */
   transform: translateX(-50%);
   transform-origin: 0 100%; /* se .kitbowl - vridpunkt på den synliga mitten, nere vid bordet */
   font-size: 64px;
@@ -4793,7 +4800,7 @@ body {
 .kitdoughflat {
   position: absolute;
   left: 50%;
-  bottom: 174px; /* se .kitbowl - samma bänkkant-korrigering (+144px), avståndet till .kitpin oförändrat */
+  bottom: 39.5%; /* se .kitbowl - samma bänkkant-korrigering, avståndet till .kitpin oförändrat */
   transform: translateX(-50%);
   width: 110px;
   height: 80px;
@@ -4807,7 +4814,7 @@ body {
      litet fast avstånd, så de alltid möts oavsett rutans höjd. Tidigare var kaveln top-
      ankrad och degen bottenankrad, vilket gjorde att kaveln svävade fritt långt ovanför
      degen istället för att röra den. */
-  bottom: 234px; /* se .kitbowl - samma bänkkant-korrigering (+144px) */
+  bottom: 53.2%; /* se .kitbowl - samma bänkkant-korrigering */
   left: 50%;
   transform: translateX(-50%);
   transform-origin: 0 50%; /* se .kitbowl - lutningen (rotate, rulli) runt kavelns synliga mitt */
@@ -4830,7 +4837,7 @@ body {
 .kitspread {
   position: absolute;
   left: 50%;
-  bottom: 174px; /* se .kitbowl - samma bänkkant-korrigering (+144px) */
+  bottom: 39.5%; /* se .kitbowl - samma bänkkant-korrigering */
   transform: translateX(-50%);
   width: fit-content;
 }
@@ -4852,7 +4859,7 @@ body {
   /* inte uppe i hörnet (top/left 20px) som kiting/kitshaker - där hamnade den rakt ovanpå
      hyllans bråte i kökbakgrunden och gick knappt att se eller hitta. Strax ovanför
      bre-ut-ytan istället, mot en lugnare del av bakgrunden. */
-  bottom: 256px; /* se .kitbowl - samma bänkkant-korrigering (+144px), hamnar fortsatt strax ovanför .kitspread */
+  bottom: 58.2%; /* se .kitbowl - samma bänkkant-korrigering, hamnar fortsatt strax ovanför .kitspread */
   left: 16px;
   object-fit: contain;
   cursor: grab;
@@ -5031,7 +5038,7 @@ body {
 .kitbatter {
   position: absolute;
   left: 50%;
-  bottom: 195px; /* se .kitbowl - samma bänkkant-korrigering (+144px), ska synas inne i skålen */
+  bottom: 44.3%; /* se .kitbowl - samma bänkkant-korrigering, ska synas inne i skålen */
   width: 104px;
   height: 28px;
   transform: translateX(-50%);
