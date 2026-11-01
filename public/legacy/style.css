@@ -4536,6 +4536,53 @@ body {
   }
 }
 
+/* spelkänsla: för få hack lämnar avsiktligt degen som en stor klump (en egen rolig "knut"-
+   rätt, se kommentaren i kitchenSetupLoika) - Klar kan alltså inte spärras bakom MIN_CHOPS
+   som i de andra momenten utan att ta bort den grenen helt. Istället syns framstegen direkt
+   på degen: ett skåror-märke per hack innan gränsen, ärligt men utan att avslöja vad som
+   händer om man slutar för tidigt. */
+.kitcutmark {
+  position: absolute;
+  top: 12%;
+  bottom: 12%;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: rgba(70, 45, 20, 0);
+  opacity: 0;
+  scale: 1 0.3;
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    scale 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.2s ease;
+}
+
+.kitcutmark.kit-cut {
+  background: rgba(70, 45, 20, 0.45);
+  opacity: 1;
+  scale: 1 1;
+}
+
+/* sista hacket (MIN_CHOPS): skårorna mörknar helt och en kniv-glimt sveper över - "nu är den
+   verkligen i bitar", samma ögonblick som kitReady-fanfaren. */
+.kitcutmark.kit-split {
+  background: rgba(70, 45, 20, 0.7);
+  animation: kitCutGlint 0.4s ease;
+}
+
+@keyframes kitCutGlint {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 255, 255, 0);
+  }
+  45% {
+    box-shadow: 0 0 6px 1px rgba(255, 255, 255, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 255, 255, 0);
+  }
+}
+
 .kitoven {
   display: block;
   margin: 0 auto;

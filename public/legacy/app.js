@@ -11510,7 +11510,19 @@
     var dough = document.getElementById("kitdough"),
       scraper = document.getElementById("kitscraper"),
       count = 0,
-      MIN_CHOPS = 3;
+      MIN_CHOPS = 3,
+      /* ett skåra-märke per kommande skärlinje (MIN_CHOPS bitar = MIN_CHOPS-1 skåror), jämnt
+         utspridda över degen - se CSS-kommentaren på .kitcutmark för varför Klar inte kan
+         spärras bakom gränsen som i andra moment. */
+      marks = [],
+      m;
+    for (m = 1; m < MIN_CHOPS; m++) {
+      var mark = document.createElement("span");
+      mark.className = "kitcutmark";
+      mark.style.left = (m / MIN_CHOPS) * 100 + "%";
+      dough.appendChild(mark);
+      marks.push(mark);
+    }
     function showContinue() {
       var c = document.getElementById("kitcontinue");
       if (c.firstChild) return;
@@ -11528,7 +11540,7 @@
       scraper.classList.remove("kit-chop");
       void scraper.offsetWidth;
       scraper.classList.add("kit-chop");
-      tone(300 + count * 20, 0.05, 0);
+      tone(kitJit(300 + count * 20), 0.05, 0);
       /* spelkänsla: hacket hade redan ljud + rörelse + stigande ton (samma byggstenar som
          puista) och är oförändrat - men gränsen MIN_CHOPS (färre hack = "stor knut") syntes
          aldrig, Klar dyker upp redan efter första hacket. Samma "nu räcker det"-glitter som
@@ -11536,7 +11548,15 @@
       var sr = scraper.getBoundingClientRect();
       kitBits(stage, sr.left + sr.width / 2, sr.bottom - 6, 3, "drop", 22, 2, "#ecd9b0");
       buzz(10);
-      if (count === MIN_CHOPS) kitReady(stage, dough);
+      if (marks[count - 1]) marks[count - 1].classList.add("kit-cut");
+      if (count === MIN_CHOPS) {
+        kitReady(stage, dough);
+        for (var k = 0; k < marks.length; k++) {
+          marks[k].classList.remove("kit-split");
+          void marks[k].offsetWidth;
+          marks[k].classList.add("kit-split");
+        }
+      }
       showContinue();
     });
   }
@@ -11557,7 +11577,10 @@
          bråte i kökbakgrunden, samma plats som gjorde smörkniven näst intill osynlig innan
          den flyttades. Degsträngen är dessutom ljus/mjölig, ännu lättare att missa mot
          träfärgen där. Flyttad till en lugnare del av bakgrunden, närmare knuten också. */
-      '<img class="kiting" id="kitrope" src="/images/kitchen/taignarull.webp" alt="" style="width:70px;height:26px;top:auto;bottom:140px;left:16px">';
+      /* buggrapport: bottom var ett fast px-värde, samma typ av bugg som .kitbowl m.fl. hade i
+         style.css (se den kommentaren på .kitstage) - fel vid andra fönsterbredder än den som
+         råkade testas. Procent av bänken istället, så den alltid hamnar på samma ställe. */
+      '<img class="kiting" id="kitrope" src="/images/kitchen/taignarull.webp" alt="" style="width:70px;height:26px;top:auto;bottom:31.8%;left:16px">';
     var rope = document.getElementById("kitrope"),
       knot = document.getElementById("kitknot"),
       dragging = false,
